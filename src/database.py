@@ -196,43 +196,28 @@ def buscar_alumno_por_curp(curp):
 
 
 def obtener_todos_los_alumnos():
+    """Obtiene todos los alumnos ordenados del más antiguo al más reciente"""
     conexion = None
     cursor = None
-
     try:
         conexion = conectar()
         cursor = conexion.cursor(dictionary=True)
-
         cursor.execute("""
             SELECT 
-                id,
-                curp,
-                p_apellido,
-                s_apellido,
-                nombre,
-                fecha_nac,
-                sexo,
-                entidad_nacimiento,
-                situacion,
-                causa_situacion,
-                tipo_periodo,
-                periodo,
-                modalidad
+                id, curp, p_apellido, s_apellido, nombre,
+                fecha_nac, sexo, entidad_nacimiento, situacion,
+                causa_situacion, tipo_periodo, periodo, modalidad
             FROM alumnos
-            ORDER BY id DESC
-        """)
-
+            ORDER BY id ASC
+        """)  # CAMBIADO: ASC en lugar de DESC
         return cursor.fetchall()
-
     except Error as e:
-        raise Exception(f"Error al obtener registros:\n{e}")
-
+        raise Exception(f"Error al obtener registros: {e}")
     finally:
         if cursor:
             cursor.close()
         if conexion:
             conexion.close()
-
 
 def actualizar_alumno(id_alumno, datos):
     conexion = None
@@ -306,6 +291,118 @@ def eliminar_alumno(id_alumno):
     except Error as e:
         raise Exception(f"Error al eliminar alumno:\n{e}")
 
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion:
+            conexion.close()
+
+
+# ==================== FUNCIONES OPTIMIZADAS ====================
+
+def contar_alumnos():
+    """Cuenta el total de alumnos (optimizado para paginación)"""
+    conexion = None
+    cursor = None
+    try:
+        conexion = conectar()
+        cursor = conexion.cursor()
+        cursor.execute("SELECT COUNT(*) FROM alumnos")
+        resultado = cursor.fetchone()
+        return resultado[0] if resultado else 0
+    except Error as e:
+        raise Exception(f"Error al contar registros: {e}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion:
+            conexion.close()
+
+
+def obtener_alumnos_paginados(offset, limite):
+    """Obtiene alumnos con paginación ordenados del más antiguo al más reciente"""
+    conexion = None
+    cursor = None
+    try:
+        conexion = conectar()
+        cursor = conexion.cursor(dictionary=True)
+        
+        cursor.execute("""
+            SELECT 
+                id, curp, p_apellido, s_apellido, nombre,
+                fecha_nac, sexo, entidad_nacimiento, situacion,
+                causa_situacion, tipo_periodo, periodo, modalidad
+            FROM alumnos
+            ORDER BY id ASC
+            LIMIT %s OFFSET %s
+        """, (limite, offset))  # CAMBIADO: ASC en lugar de DESC
+        
+        return cursor.fetchall()
+    except Error as e:
+        raise Exception(f"Error al obtener registros: {e}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion:
+            conexion.close()
+
+def buscar_alumnos_por_filtro(filtro, offset=0, limite=20):
+    """Busca alumnos por CURP, nombre o apellido (con paginación)"""
+    conexion = None
+    cursor = None
+    try:
+        conexion = conectar()
+        cursor = conexion.cursor(dictionary=True)
+        
+        busqueda = f"%{filtro}%"
+        
+        cursor.execute("""
+            SELECT 
+                id, curp, p_apellido, s_apellido, nombre,
+                fecha_nac, sexo, entidad_nacimiento, situacion,
+                causa_situacion, tipo_periodo, periodo, modalidad
+            FROM alumnos
+            WHERE curp LIKE %s 
+               OR p_apellido LIKE %s 
+               OR s_apellido LIKE %s 
+               OR nombre LIKE %s
+            ORDER BY id DESC
+            LIMIT %s OFFSET %s
+        """, (busqueda, busqueda, busqueda, busqueda, limite, offset))
+        
+        return cursor.fetchall()
+    except Error as e:
+        raise Exception(f"Error al buscar alumnos: {e}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion:
+            conexion.close()
+
+
+def contar_alumnos_por_filtro(filtro):
+    """Cuenta alumnos que coinciden con el filtro"""
+    conexion = None
+    cursor = None
+    try:
+        conexion = conectar()
+        cursor = conexion.cursor()
+        
+        busqueda = f"%{filtro}%"
+        
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM alumnos
+            WHERE curp LIKE %s 
+               OR p_apellido LIKE %s 
+               OR s_apellido LIKE %s 
+               OR nombre LIKE %s
+        """, (busqueda, busqueda, busqueda, busqueda))
+        
+        resultado = cursor.fetchone()
+        return resultado[0] if resultado else 0
+    except Error as e:
+        raise Exception(f"Error al contar alumnos filtrados: {e}")
     finally:
         if cursor:
             cursor.close()
